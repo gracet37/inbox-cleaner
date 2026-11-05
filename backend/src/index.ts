@@ -6,9 +6,16 @@ import cors from "cors";
 import express from "express";
 import session from "express-session";
 import { createServer } from "node:http";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import FileStoreFactory from "session-file-store";
 import { authRouter } from "./auth.js";
 import { config } from "./config.js";
 import { resolvers, typeDefs } from "./schema.js";
+
+const FileStore = FileStoreFactory(session);
+const sessionDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../.sessions");
+const sessionTtlSeconds = 7 * 24 * 60 * 60;
 
 const app = express();
 const httpServer = createServer(app);
@@ -29,6 +36,13 @@ const corsOptions: cors.CorsOptions = {
 app.use(cors(corsOptions));
 app.use(
   session({
+    store: new FileStore({
+      path: sessionDir,
+      ttl: sessionTtlSeconds,
+      retries: 0,
+      secret: config.sessionSecret,
+      logFn: () => {},
+    }),
     name: "inbox.sid",
     secret: config.sessionSecret,
     resave: false,
@@ -37,7 +51,7 @@ app.use(
       httpOnly: true,
       sameSite: "lax",
       secure: false,
-      maxAge: 7 * 24 * 60 * 60 * 1000,
+      maxAge: sessionTtlSeconds * 1000,
     },
   }),
 );
