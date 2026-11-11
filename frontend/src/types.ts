@@ -9,6 +9,7 @@ export type Message = {
   receivedAt: string;
   unread: boolean;
   category: MessageCategory;
+  sizeEstimate: number;
 };
 
 export type InboxStats = {

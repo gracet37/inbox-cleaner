@@ -198,10 +198,7 @@ export async function listInbox(session: GmailSession): Promise<{
     await Promise.all(ids.map((id) => getMessage(gmail, id)))
   ).filter((message): message is Message => message !== null);
 
-  const emailBySender = groupMessageBySender(messages)
-
   const senderStats = getSenderStats(messages)
-  console.log("🚀 ~ listInbox ~ senderStats:", emailBySender)
 
   return { messages, stats: inboxStats(messages), senderStats };
 }
@@ -222,6 +219,37 @@ export async function archiveMessages(session: GmailSession, ids: string[]) {
   });
   await persistRefreshedTokens(session, client);
   return listInbox(session);
+}
+
+export async function trashMessages(session: GmailSession, ids: string[]) {
+  if (ids.length === 0) {
+    return listInbox(session);
+  }
+
+  const client = authFromSession(session);
+  const gmail = google.gmail({ version: "v1", auth: client });
+  await Promise.all(
+    ids.map((id) =>
+      gmail.users.messages.trash({
+        userId: "me",
+        id,
+      }),
+    ),
+  );
+  await persistRefreshedTokens(session, client);
+  console.log("email trashed")
+  return listInbox(session);
+}
+
+export async function unsubscribeMessages(session: GmailSession, emails: string[]) {
+  const client = authFromSession(session);
+  const gmail = google.gmail({ version: "v1", auth: client });
+  const results = [];
+  for (const email of emails) {
+    results.push(await unsubscribeAddress(gmail, session.email ?? "", email));
+  }
+  await persistRefreshedTokens(session, client);
+  return results;
 }
 
 async function getMessage(gmail: gmail_v1.Gmail, id: string): Promise<Message | null> {
@@ -248,6 +276,7 @@ async function getMessage(gmail: gmail_v1.Gmail, id: string): Promise<Message | 
     receivedAt,
     unread: labels.includes("UNREAD"),
     category: categoryFromLabels(labels),
+    sizeEstimate: data.sizeEstimate ?? 0
   };
 }
 
@@ -290,6 +319,131 @@ function inboxStats(messages: Message[]): InboxStats {
     newsletters: messages.filter((message) => message.category === "newsletter").length,
     promotions: messages.filter((message) => message.category === "promotion").length,
   };
+}
+
+async function unsubscribeAddress(gmail: gmail_v1.Gmail, from: string, email: string) {
+  if (!isEmailAddress(email)) return { email, unsubscribed: false };
+
+  const listed = await gmail.users.messages.list({
+    userId: "me",
+    q: `from:"${email.replaceAll('"', "")}"`,
+    maxResults: 8,
+  });
+  const ids = listed.data.messages?.map((message) => message.id).filter((id): id is string => Boolean(id)) ?? [];
+
+  for (const id of ids) {
+    const { data } = await gmail.users.messages.get({
+      userId: "me",
+      id,
+      format: "metadata",
+      metadataHeaders: ["List-Unsubscribe", "List-Unsubscribe-Post"],
+    });
+    const headers = data.payload?.headers ?? [];
+    const listUnsubscribe = headerValue(headers, "List-Unsubscribe");
+    if (!listUnsubscribe) continue;
+
+    const targets = unsubscribeTargets(listUnsubscribe);
+    const oneClick = headerValue(headers, "List-Unsubscribe-Post").toLowerCase().includes("list-unsubscribe=one-click");
+    const httpsUrl = oneClick && targets.https ? safeHttpsUrl(targets.https) : null;
+    if (httpsUrl && (await postOneClickUnsubscribe(httpsUrl))) {
+      return { email, unsubscribed: true };
+    }
+    if (targets.mailto && (await sendMailtoUnsubscribe(gmail, from, targets.mailto))) {
+      return { email, unsubscribed: true };
+    }
+  }
+
+  return { email, unsubscribed: false };
+}
+
+function unsubscribeTargets(header: string) {
+  const bracketed = [...header.matchAll(/<([^>]+)>/g)].map((match) => match[1].trim());
+  const values = bracketed.length > 0 ? bracketed : header.split(",").map((part) => part.trim());
+  return {
+    mailto: values.find((value) => value.toLowerCase().startsWith("mailto:")) ?? null,
+    https: values.find((value) => value.toLowerCase().startsWith("https:")) ?? null,
+  };
+}
+
+function safeHttpsUrl(value: string) {
+  try {
+    const url = new URL(value);
+    if (url.protocol !== "https:" || isBlockedHost(url.hostname)) return null;
+    return url;
+  } catch {
+    return null;
+  }
+}
+
+function isBlockedHost(hostname: string) {
+  const host = hostname.replace(/^\[|\]$/g, "").toLowerCase();
+  if (host === "localhost" || host.endsWith(".localhost") || host.endsWith(".local")) return true;
+  const match = host.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+  if (!match) {
+    if (!host.includes(":")) return false;
+    return host === "::1" || host.startsWith("fc") || host.startsWith("fd") || host.startsWith("fe80");
+  }
+  const [first, second] = match.slice(1).map(Number);
+  if ([first, second].some((part) => part > 255)) return true;
+  return (
+    first === 0 ||
+    first === 10 ||
+    first === 127 ||
+    (first === 169 && second === 254) ||
+    (first === 172 && second >= 16 && second <= 31) ||
+    (first === 192 && second === 168)
+  );
+}
+
+async function postOneClickUnsubscribe(url: URL) {
+  try {
+    const response = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: "List-Unsubscribe=One-Click",
+      redirect: "manual",
+      signal: AbortSignal.timeout(10_000),
+    });
+    return response.status >= 200 && response.status < 300;
+  } catch {
+    return false;
+  }
+}
+
+async function sendMailtoUnsubscribe(gmail: gmail_v1.Gmail, from: string, mailto: string) {
+  let url: URL;
+  try {
+    url = new URL(mailto);
+  } catch {
+    return false;
+  }
+  const to = decodeURIComponent(url.pathname);
+  if (!isEmailAddress(to)) return false;
+  const subject = url.searchParams.get("subject") ?? "Unsubscribe";
+  const body = url.searchParams.get("body") ?? "Unsubscribe";
+  const raw = Buffer.from(
+    [
+      ...(from ? [`From: ${from}`] : []),
+      `To: ${to}`,
+      `Subject: ${subject}`,
+      "MIME-Version: 1.0",
+      "Content-Type: text/plain; charset=utf-8",
+      "",
+      body,
+    ].join("\r\n"),
+  )
+    .toString("base64url");
+
+  try {
+    await gmail.users.messages.send({ userId: "me", requestBody: { raw } });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function isEmailAddress(value: string) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 }
 
 export const emptyInbox = {

@@ -34,8 +34,8 @@ type InboxQueryData = {
 
 const nav = [
   { to: "/", label: "Overview", icon: <SpaceDashboardOutlinedIcon fontSize="small" />, end: true },
-  { to: "/inbox", label: "Inbox cleanup", icon: <InboxOutlinedIcon fontSize="small" />, countKey: "inbox" as const },
-  { to: "/clean", label: "Unsubscribe", icon: <UnsubscribeOutlinedIcon fontSize="small" />, countKey: "clean" as const },
+  { to: "/delete", label: "Inbox cleanup", icon: <InboxOutlinedIcon fontSize="small" />, countKey: "inbox" as const },
+  { to: "/unsubscribe", label: "Unsubscribe", icon: <UnsubscribeOutlinedIcon fontSize="small" />, countKey: "clean" as const },
 ];
 
 export default function AppLayout() {

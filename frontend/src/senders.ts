@@ -11,6 +11,7 @@ export type SenderRow = {
   rarelyRead: boolean;
   category: string;
   messageIds: string[];
+  sizeEstimate: number;
   status: SenderStatus;
 };
 
@@ -63,6 +64,7 @@ export function sendersFromMessages(messages: Message[]): SenderRow[] {
         rarelyRead: readRate <= 0.15,
         category: latest.category,
         messageIds: list.map((message) => message.id),
+        sizeEstimate: Math.max(...list.map((message) => message.sizeEstimate)),
         status: "active" as const,
       };
     })
@@ -79,6 +81,7 @@ export const demoSenders: SenderRow[] = [
     rarelyRead: true,
     category: "promotion",
     messageIds: [],
+    sizeEstimate: 180_000,
     status: "active",
   },
   {
@@ -90,6 +93,7 @@ export const demoSenders: SenderRow[] = [
     rarelyRead: true,
     category: "promotion",
     messageIds: [],
+    sizeEstimate: 1_600_000,
     status: "active",
   },
   {
@@ -101,6 +105,7 @@ export const demoSenders: SenderRow[] = [
     rarelyRead: true,
     category: "newsletter",
     messageIds: [],
+    sizeEstimate: 6_200_000,
     status: "active",
   },
   {
@@ -112,6 +117,7 @@ export const demoSenders: SenderRow[] = [
     rarelyRead: true,
     category: "promotion",
     messageIds: [],
+    sizeEstimate: 540_000,
     status: "active",
   },
   {
@@ -123,6 +129,7 @@ export const demoSenders: SenderRow[] = [
     rarelyRead: true,
     category: "newsletter",
     messageIds: [],
+    sizeEstimate: 2_400_000,
     status: "active",
   },
   {
@@ -134,6 +141,7 @@ export const demoSenders: SenderRow[] = [
     rarelyRead: false,
     category: "newsletter",
     messageIds: [],
+    sizeEstimate: 90_000,
     status: "active",
   },
   {
@@ -145,6 +153,7 @@ export const demoSenders: SenderRow[] = [
     rarelyRead: false,
     category: "newsletter",
     messageIds: [],
+    sizeEstimate: 5_500_000,
     status: "active",
   },
   {
@@ -156,6 +165,7 @@ export const demoSenders: SenderRow[] = [
     rarelyRead: false,
     category: "newsletter",
     messageIds: [],
+    sizeEstimate: 1_100_000,
     status: "active",
   },
 ];

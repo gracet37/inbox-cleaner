@@ -21,6 +21,7 @@ export const INBOX_QUERY = gql`
         receivedAt
         unread
         category
+        sizeEstimate
       }
       stats {
         total
@@ -46,6 +47,7 @@ export const CLEAN_MESSAGES_MUTATION = gql`
           receivedAt
           unread
           category
+          sizeEstimate
         }
         stats {
           total
@@ -54,6 +56,15 @@ export const CLEAN_MESSAGES_MUTATION = gql`
           promotions
         }
       }
+    }
+  }
+`;
+
+export const UNSUBSCRIBE_MESSAGES_MUTATION = gql`
+  mutation UnsubscribeMessages($emails: [String!]!) {
+    unsubscribeMessages(emails: $emails) {
+      email
+      unsubscribed
     }
   }
 `;

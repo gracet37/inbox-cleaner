@@ -1,6 +1,6 @@
 import { GraphQLError } from "graphql";
 import type { Session, SessionData } from "express-session";
-import { archiveMessages, emptyInbox, listInbox } from "./gmail.js";
+import { emptyInbox, listInbox, trashMessages, unsubscribeMessages } from "./gmail.js";
 
 type Context = {
   session: Session & Partial<SessionData>;
@@ -32,6 +32,7 @@ export const typeDefs = `#graphql
     receivedAt: String!
     unread: Boolean!
     category: MessageCategory!
+    sizeEstimate: Int!
   }
 
   type InboxStats {
@@ -61,6 +62,11 @@ export const typeDefs = `#graphql
     inbox: Inbox!
   }
 
+  type UnsubscribeResult {
+    email: String!
+    unsubscribed: Boolean!
+  }
+
   type Query {
     health: Health!
     auth: Auth!
@@ -69,6 +75,7 @@ export const typeDefs = `#graphql
 
   type Mutation {
     cleanMessages(ids: [ID!]!): CleanResult!
+    unsubscribeMessages(emails: [String!]!): [UnsubscribeResult!]!
     disconnectGmail: Auth!
   }
 `;
@@ -90,8 +97,12 @@ export const resolvers = {
   Mutation: {
     cleanMessages: async (_parent: unknown, args: { ids: string[] }, context: Context) => {
       const gmail = requireGmail(context.session);
-      const inbox = await archiveMessages(gmail, args.ids);
+      const inbox = await trashMessages(gmail, args.ids);
       return { removed: args.ids.length, inbox };
+    },
+    unsubscribeMessages: async (_parent: unknown, args: { emails: string[] }, context: Context) => {
+      const gmail = requireGmail(context.session);
+      return unsubscribeMessages(gmail, args.emails);
     },
     disconnectGmail: (_parent: unknown, _args: unknown, context: Context) => {
       context.session.gmail = undefined;

@@ -10,6 +10,7 @@ export const messages: Message[] = [
     receivedAt: "2026-10-29T08:12:00.000Z",
     unread: true,
     category: "newsletter",
+    sizeEstimate: 240_000,
   },
   {
     id: "2",
@@ -20,6 +21,7 @@ export const messages: Message[] = [
     receivedAt: "2026-10-29T07:41:00.000Z",
     unread: true,
     category: "primary",
+    sizeEstimate: 18_000,
   },
   {
     id: "3",
@@ -30,6 +32,7 @@ export const messages: Message[] = [
     receivedAt: "2026-10-28T22:05:00.000Z",
     unread: true,
     category: "promotion",
+    sizeEstimate: 1_800_000,
   },
   {
     id: "4",
@@ -40,6 +43,7 @@ export const messages: Message[] = [
     receivedAt: "2026-10-28T18:20:00.000Z",
     unread: false,
     category: "social",
+    sizeEstimate: 90_000,
   },
   {
     id: "5",
@@ -50,6 +54,7 @@ export const messages: Message[] = [
     receivedAt: "2026-10-28T15:02:00.000Z",
     unread: false,
     category: "primary",
+    sizeEstimate: 42_000,
   },
   {
     id: "6",
@@ -60,5 +65,6 @@ export const messages: Message[] = [
     receivedAt: "2026-10-27T11:48:00.000Z",
     unread: true,
     category: "newsletter",
+    sizeEstimate: 6_400_000,
   },
 ];
